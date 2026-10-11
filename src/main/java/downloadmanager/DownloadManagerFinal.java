@@ -55,6 +55,18 @@ public class DownloadManagerFinal {
     /** Замок, що захищає {@link #totalDownloaded}. */
     private static final Object lock = new Object();
 
+    // ---------- Спільний лічильник «Активних завантажень» ----------
+
+    /** Скільки завантажень виконується прямо зараз. */
+    private static int activeDownloads = 0;
+
+    /**
+     * Окремий замок для {@link #activeDownloads}: це логічно інша
+     * сутність, ніж мегабайти, тому потоки, що оновлюють один лічильник,
+     * не мусять чекати на інший.
+     */
+    private static final Object activeLock = new Object();
+
     // ---------- Стан кожного завантаження ----------
 
     /**
@@ -77,6 +89,7 @@ public class DownloadManagerFinal {
             new JButton[DOWNLOAD_COUNT];
     private static final JLabel[] statusLabels = new JLabel[DOWNLOAD_COUNT];
     private static JLabel totalLabel;
+    private static JLabel activeLabel;
 
     public static void main(String[] args) {
         // Вікно створюється на EDT.
@@ -96,9 +109,11 @@ public class DownloadManagerFinal {
         frame.add(downloadsPanel, BorderLayout.CENTER);
 
         totalLabel = new JLabel(totalText(0));
-        JPanel bottomPanel = new JPanel(new GridLayout(1, 1));
+        activeLabel = new JLabel(activeText(0));
+        JPanel bottomPanel = new JPanel(new GridLayout(1, 2));
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
         bottomPanel.add(totalLabel);
+        bottomPanel.add(activeLabel);
         frame.add(bottomPanel, BorderLayout.SOUTH);
 
         frame.pack();
@@ -178,6 +193,7 @@ public class DownloadManagerFinal {
 
     /** Тіло потоку завантаження (виконується НЕ на EDT). */
     private static void runDownload(int index) {
+        changeActive(+1); // завантаження почалося — на самому початку потоку
         int progress = 0;
         boolean completed = false;
         try {
@@ -198,6 +214,11 @@ public class DownloadManagerFinal {
         } catch (InterruptedException e) {
             // Потік перервано кнопкою «Скасувати» — це і є скасування.
         } finally {
+            // finally виконується в ОБОХ випадках: і коли дійшли до 100%,
+            // і коли вийшли через return/InterruptedException після
+            // скасування. Тому лічильник активних ніколи не «застрягає».
+            // Зменшуємо його до того, як знову ввімкнеться «Старт».
+            changeActive(-1);
             finishDownload(index, completed, progress);
         }
     }
@@ -229,6 +250,23 @@ public class DownloadManagerFinal {
             SwingUtilities.invokeLater(
                     () -> totalLabel.setText(totalText(current)));
         }
+    }
+
+    /**
+     * Змінює кількість активних завантажень: +1 на початку потоку,
+     * -1 при завершенні чи скасуванні.
+     */
+    private static void changeActive(int delta) {
+        synchronized (activeLock) {
+            activeDownloads += delta;
+            int current = activeDownloads;
+            SwingUtilities.invokeLater(
+                    () -> activeLabel.setText(activeText(current)));
+        }
+    }
+
+    private static String activeText(int active) {
+        return "Активних завантажень: " + active + " з " + DOWNLOAD_COUNT;
     }
 
     private static String totalText(int megabytes) {
