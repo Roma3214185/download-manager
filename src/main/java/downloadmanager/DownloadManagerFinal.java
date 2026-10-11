@@ -30,18 +30,19 @@ import javax.swing.SwingUtilities;
  */
 public class DownloadManagerFinal {
 
-    private static final int DOWNLOAD_COUNT = 3;
+    private static final int DOWNLOAD_COUNT = 5;
 
     /** Назви файлів, що «завантажуються». */
     private static final String[] NAMES = {
-        "Фільм.mkv", "Музика.zip", "Документи.pdf"
+        "Фільм.mkv", "Музика.zip", "Документи.pdf", "Гра.iso",
+        "Фото.rar"
     };
 
     /** Розміри файлів у МБ (кратні 10: за крок завантажується 10%). */
-    private static final int[] SIZES_MB = {700, 120, 40};
+    private static final int[] SIZES_MB = {700, 120, 40, 1500, 250};
 
     /** Затримка одного кроку (10%) — різна, щоб було видно паралельність. */
-    private static final int[] STEP_DELAY_MS = {900, 500, 300};
+    private static final int[] STEP_DELAY_MS = {900, 500, 300, 1200, 600};
 
     private static final int STEP_PERCENT = 10;
     private static final int MAX_PERCENT = 100;
